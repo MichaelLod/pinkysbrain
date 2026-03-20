@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.next/
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.env
+.env.local
+*.h5
+data/raw/
+data/indexed/
+.DS_Store
+*.log
