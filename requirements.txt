@@ -1,0 +1,2 @@
+cl-sdk>=0.29.0
+websockets>=12.0

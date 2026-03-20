@@ -170,12 +170,16 @@ We're building the community gateway to biological computing. pinkysbrain makes 
 # Python 3.12+, Node.js 20+, pnpm
 
 # Install dependencies
-pnpm install
-pip install cl-sdk
+cd web && pnpm install && cd ..
+pip install -r requirements.txt
 
-# Start development
-pnpm dev          # Frontend dev server
-python -m server  # Backend with CL SDK simulator
+# Start the backend (CL SDK simulator + WebSocket server)
+python -m server
+
+# Start the frontend (in another terminal)
+cd web && pnpm dev
+
+# Open http://localhost:3000/play to play Pong against the neurons
 
 # With real neural data
 CL_SDK_REPLAY_PATH=data/raw/pong_session_01.h5 python -m server
@@ -183,11 +187,12 @@ CL_SDK_REPLAY_PATH=data/raw/pong_session_01.h5 python -m server
 
 ## Roadmap
 
-- [ ] Three.js 3D brain renderer with 59-electrode MEA layout
-- [ ] WebSocket pipeline (Python CL SDK ↔ Browser)
-- [ ] Pong game engine with stim encoder / spike decoder
-- [ ] CL SDK analysis integration (firing stats, connectivity, criticality)
-- [ ] Analysis dashboard overlay
+- [x] Three.js 3D brain renderer with 59-electrode MEA layout
+- [x] WebSocket pipeline (Python CL SDK ↔ Browser)
+- [x] Pong game engine with stim encoder / spike decoder
+- [x] Real-time firing rate analysis
+- [x] Analysis dashboard overlay
+- [ ] Full CL SDK analysis integration (connectivity, criticality)
 - [ ] Real CL1 neural recordings integration
 - [ ] Reaction challenge game mode
 - [ ] Pattern recognition game mode

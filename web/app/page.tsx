@@ -37,6 +37,15 @@ export default function Home() {
               </svg>
               View on GitHub
             </a>
+            <a
+              href="/play"
+              className="flex items-center gap-2 px-6 py-3 bg-blue-500/20 backdrop-blur-sm border border-blue-400/20 rounded-full text-sm font-medium text-blue-300 hover:bg-blue-500/30 transition-all"
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+              Play Pong
+            </a>
           </div>
 
           <div className="animate-fade-in-up delay-600 grid grid-cols-1 sm:grid-cols-3 gap-6 text-left">
