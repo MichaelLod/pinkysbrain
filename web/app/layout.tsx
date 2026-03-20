@@ -20,7 +20,7 @@ export const metadata: Metadata = {
     title: "pinkysbrain — Play against living neurons",
     description:
       "Play games against 800,000 lab-grown human neurons. Watch them think in real time.",
-    url: "https://pinkysbrain.com",
+    url: "https://pinkysbrain.xyz",
     siteName: "pinkysbrain",
     type: "website",
   },
