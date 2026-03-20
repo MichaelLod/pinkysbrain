@@ -2,6 +2,8 @@
 
 **Play against living neurons. Watch them think.**
 
+🌐 [pinkysbrain.com](https://pinkysbrain.com)
+
 A browser-based platform where humans play classic games against real neural recordings from biological computers. Every spike, every wave, every decision — visualized on a 3D brain in real time.
 
 Built on top of the [Cortical Labs CL SDK](https://github.com/Cortical-Labs/cl-sdk).
