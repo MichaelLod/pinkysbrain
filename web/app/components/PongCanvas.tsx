@@ -28,28 +28,6 @@ export default function PongCanvas({ gameState, onPlayerInput }: PongCanvasProps
     }
   }, [gameState]);
 
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const rect = canvas.getBoundingClientRect();
-      const y = (e.clientY - rect.top) / rect.height;
-      onPlayerInput(Math.max(0, Math.min(1, y)));
-    },
-    [onPlayerInput]
-  );
-
-  const handleTouchMove = useCallback(
-    (e: React.TouchEvent<HTMLCanvasElement>) => {
-      const canvas = canvasRef.current;
-      if (!canvas || !e.touches[0]) return;
-      const rect = canvas.getBoundingClientRect();
-      const y = (e.touches[0].clientY - rect.top) / rect.height;
-      onPlayerInput(Math.max(0, Math.min(1, y)));
-    },
-    [onPlayerInput]
-  );
-
   useEffect(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
@@ -61,6 +39,21 @@ export default function PongCanvas({ gameState, onPlayerInput }: PongCanvasProps
     };
     resize();
     window.addEventListener("resize", resize);
+
+    // Track mouse globally so paddle follows even outside canvas
+    const handleGlobalMouse = (e: MouseEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      const y = (e.clientY - rect.top) / rect.height;
+      onPlayerInput(Math.max(0, Math.min(1, y)));
+    };
+    const handleGlobalTouch = (e: TouchEvent) => {
+      if (!e.touches[0]) return;
+      const rect = canvas.getBoundingClientRect();
+      const y = (e.touches[0].clientY - rect.top) / rect.height;
+      onPlayerInput(Math.max(0, Math.min(1, y)));
+    };
+    window.addEventListener("mousemove", handleGlobalMouse);
+    window.addEventListener("touchmove", handleGlobalTouch);
 
     let animId: number;
 
@@ -158,17 +151,17 @@ export default function PongCanvas({ gameState, onPlayerInput }: PongCanvasProps
 
     return () => {
       window.removeEventListener("resize", resize);
+      window.removeEventListener("mousemove", handleGlobalMouse);
+      window.removeEventListener("touchmove", handleGlobalTouch);
       cancelAnimationFrame(animId);
     };
-  }, []);
+  }, [onPlayerInput]);
 
   return (
     <div ref={containerRef} className="w-full h-full">
       <canvas
         ref={canvasRef}
         className="w-full h-full cursor-none"
-        onMouseMove={handleMouseMove}
-        onTouchMove={handleTouchMove}
       />
     </div>
   );
