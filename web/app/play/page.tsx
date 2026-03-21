@@ -1,8 +1,8 @@
 "use client";
 
+import { useRef } from "react";
 import { useNeuralSocket } from "../hooks/useNeuralSocket";
 import NeuralBrain from "../components/NeuralBrain";
-import PongCanvas from "../components/PongCanvas";
 import AnalysisOverlay from "../components/AnalysisOverlay";
 import Link from "next/link";
 
@@ -137,38 +137,43 @@ function SetupGuide() {
 
 export default function PlayPage() {
   const { connected, latestTick, tickRef, prevTickRef, tickTimeRef, sendPlayerInput } = useNeuralSocket(WS_URL);
+  const scoreRef = useRef<HTMLDivElement>(null);
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-[#050508]">
-      {/* 3D brain background */}
+      {/* 3D brain + Pong (single WebGL renderer, all meshes) */}
       <div className="absolute inset-0 z-0">
         <NeuralBrain
           mode={connected ? "live" : "demo"}
           spikeData={latestTick?.spikes}
           stimData={latestTick?.stims}
+          showPong={connected}
+          tickRef={tickRef}
+          prevTickRef={prevTickRef}
+          tickTimeRef={tickTimeRef}
+          onPlayerInput={sendPlayerInput}
+          scoreRef={scoreRef}
         />
       </div>
 
-      <div className="absolute inset-0 bg-gradient-to-b from-[#050508]/30 via-transparent to-[#050508]/30 z-10 pointer-events-none" />
+      {/* Score overlay (HTML, updated by rAF loop via ref) */}
+      {connected && (
+        <div className="absolute top-[18%] left-0 right-56 z-10 flex justify-center pointer-events-none">
+          <div
+            ref={scoreRef}
+            className="text-zinc-400/60 font-mono text-lg tracking-widest"
+          >
+            YOU 0 : 0 NEURONS
+          </div>
+        </div>
+      )}
 
       {/* Content layer */}
-      <div className="relative z-20 h-full">
+      <div className="relative z-20 h-full pointer-events-none">
         {connected ? (
-          <div className="flex h-full">
-            {/* Pong */}
-            <div className="flex-1 flex items-center justify-center p-4">
-              <div className="w-full max-w-3xl aspect-[4/3] rounded-xl overflow-hidden border border-white/[0.06]">
-                <PongCanvas
-                  tickRef={tickRef}
-                  prevTickRef={prevTickRef}
-                  tickTimeRef={tickTimeRef}
-                  onPlayerInput={sendPlayerInput}
-                />
-              </div>
-            </div>
-
+          <div className="flex h-full justify-end">
             {/* Analysis sidebar */}
-            <div className="w-56 p-4 flex flex-col gap-4">
+            <div className="w-56 p-4 flex flex-col gap-4 pointer-events-auto">
               <Link
                 href="/"
                 className="text-zinc-500 hover:text-zinc-300 transition-colors font-mono text-xs"

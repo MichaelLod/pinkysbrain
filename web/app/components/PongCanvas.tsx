@@ -52,21 +52,14 @@ export default function PongCanvas({
     window.addEventListener("mousemove", handleGlobalMouse);
     window.addEventListener("touchmove", handleGlobalTouch);
 
-    let animId: number;
+    const ctx = canvas.getContext("2d")!;
+    let flipFlop = false;
 
     function render() {
-      const ctx = canvas!.getContext("2d");
-      if (!ctx) {
-        animId = requestAnimationFrame(render);
-        return;
-      }
+      if (!ctx) return;
 
-      // Read directly from refs — no React in the loop
       const state = tickRef.current?.game;
-      if (!state) {
-        animId = requestAnimationFrame(render);
-        return;
-      }
+      if (!state) return;
 
       const w = canvas!.width;
       const h = canvas!.height;
@@ -139,22 +132,25 @@ export default function PongCanvas({
       ctx.shadowBlur = 0;
       ctx.shadowColor = "transparent";
 
-      animId = requestAnimationFrame(render);
+      // Force Chrome compositor to stay active when WebGL + Canvas 2D coexist
+      flipFlop = !flipFlop;
+      canvas!.style.opacity = flipFlop ? "0.999999" : "1";
+
+      requestAnimationFrame(render);
     }
 
-    animId = requestAnimationFrame(render);
+    requestAnimationFrame(render);
 
     return () => {
       window.removeEventListener("resize", resize);
       window.removeEventListener("mousemove", handleGlobalMouse);
       window.removeEventListener("touchmove", handleGlobalTouch);
-      cancelAnimationFrame(animId);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div ref={containerRef} className="w-full h-full">
-      <canvas ref={canvasRef} className="w-full h-full cursor-none" style={{ willChange: "contents" }} />
+      <canvas ref={canvasRef} className="w-full h-full cursor-none" />
     </div>
   );
 }
