@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import type { GameState } from "../hooks/useNeuralSocket";
 
 interface PongCanvasProps {
@@ -11,7 +11,7 @@ interface PongCanvasProps {
 const PADDLE_WIDTH = 0.015;
 const PADDLE_HEIGHT = 0.15;
 const BALL_RADIUS = 0.01;
-const TICK_MS = 50; // server sends at 20 ticks/sec
+const TICK_MS = 50;
 
 export default function PongCanvas({ gameState, onPlayerInput }: PongCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -19,6 +19,10 @@ export default function PongCanvas({ gameState, onPlayerInput }: PongCanvasProps
   const stateRef = useRef<GameState | null>(null);
   const prevStateRef = useRef<GameState | null>(null);
   const lastTickTime = useRef(0);
+  const onPlayerInputRef = useRef(onPlayerInput);
+
+  // Keep refs in sync without triggering re-renders
+  onPlayerInputRef.current = onPlayerInput;
 
   useEffect(() => {
     if (gameState) {
@@ -28,6 +32,7 @@ export default function PongCanvas({ gameState, onPlayerInput }: PongCanvasProps
     }
   }, [gameState]);
 
+  // Single stable effect for the entire render loop + input
   useEffect(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
@@ -40,17 +45,16 @@ export default function PongCanvas({ gameState, onPlayerInput }: PongCanvasProps
     resize();
     window.addEventListener("resize", resize);
 
-    // Track mouse globally so paddle follows even outside canvas
     const handleGlobalMouse = (e: MouseEvent) => {
       const rect = canvas.getBoundingClientRect();
       const y = (e.clientY - rect.top) / rect.height;
-      onPlayerInput(Math.max(0, Math.min(1, y)));
+      onPlayerInputRef.current(Math.max(0, Math.min(1, y)));
     };
     const handleGlobalTouch = (e: TouchEvent) => {
       if (!e.touches[0]) return;
       const rect = canvas.getBoundingClientRect();
       const y = (e.touches[0].clientY - rect.top) / rect.height;
-      onPlayerInput(Math.max(0, Math.min(1, y)));
+      onPlayerInputRef.current(Math.max(0, Math.min(1, y)));
     };
     window.addEventListener("mousemove", handleGlobalMouse);
     window.addEventListener("touchmove", handleGlobalTouch);
@@ -59,7 +63,10 @@ export default function PongCanvas({ gameState, onPlayerInput }: PongCanvasProps
 
     function render() {
       const ctx = canvas!.getContext("2d");
-      if (!ctx) return;
+      if (!ctx) {
+        animId = requestAnimationFrame(render);
+        return;
+      }
 
       const state = stateRef.current;
       if (!state) {
@@ -70,13 +77,11 @@ export default function PongCanvas({ gameState, onPlayerInput }: PongCanvasProps
       const w = canvas!.width;
       const h = canvas!.height;
 
-      // Interpolate ball position using velocity
       const elapsed = performance.now() - lastTickTime.current;
-      const t = Math.min(elapsed / TICK_MS, 2); // clamp to avoid overshoot
+      const t = Math.min(elapsed / TICK_MS, 2);
       const ballX = state.ball_x + state.ball_vx * t;
       const ballY = state.ball_y + state.ball_vy * t;
 
-      // Smooth paddle positions (lerp toward target)
       const prev = prevStateRef.current;
       const lerpT = Math.min(elapsed / TICK_MS, 1);
       const neuralPaddleY = prev
@@ -88,11 +93,9 @@ export default function PongCanvas({ gameState, onPlayerInput }: PongCanvasProps
 
       ctx.clearRect(0, 0, w, h);
 
-      // Background
       ctx.fillStyle = "rgba(5, 5, 8, 0.85)";
       ctx.fillRect(0, 0, w, h);
 
-      // Center line
       ctx.setLineDash([8, 8]);
       ctx.strokeStyle = "rgba(100, 140, 255, 0.15)";
       ctx.lineWidth = 1;
@@ -102,7 +105,6 @@ export default function PongCanvas({ gameState, onPlayerInput }: PongCanvasProps
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Score
       ctx.fillStyle = "rgba(200, 210, 255, 0.6)";
       ctx.font = `${Math.max(16, w * 0.04)}px monospace`;
       ctx.textAlign = "center";
@@ -112,7 +114,6 @@ export default function PongCanvas({ gameState, onPlayerInput }: PongCanvasProps
         Math.max(24, h * 0.06)
       );
 
-      // Player paddle (left)
       const pw = PADDLE_WIDTH * w;
       const ph = PADDLE_HEIGHT * h;
       const px = w * 0.03;
@@ -122,7 +123,6 @@ export default function PongCanvas({ gameState, onPlayerInput }: PongCanvasProps
       ctx.shadowBlur = 10;
       ctx.fillRect(px, py, pw, ph);
 
-      // Neural paddle (right)
       const nx = w * 0.97 - pw;
       const ny = neuralPaddleY * h - ph / 2;
       ctx.fillStyle = "rgba(255, 140, 60, 0.8)";
@@ -130,7 +130,6 @@ export default function PongCanvas({ gameState, onPlayerInput }: PongCanvasProps
       ctx.shadowBlur = 10;
       ctx.fillRect(nx, ny, pw, ph);
 
-      // Ball
       const bx = Math.max(0, Math.min(1, ballX)) * w;
       const by = Math.max(0, Math.min(1, ballY)) * h;
       const br = BALL_RADIUS * w;
@@ -155,14 +154,11 @@ export default function PongCanvas({ gameState, onPlayerInput }: PongCanvasProps
       window.removeEventListener("touchmove", handleGlobalTouch);
       cancelAnimationFrame(animId);
     };
-  }, [onPlayerInput]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div ref={containerRef} className="w-full h-full">
-      <canvas
-        ref={canvasRef}
-        className="w-full h-full cursor-none"
-      />
+      <canvas ref={canvasRef} className="w-full h-full cursor-none" />
     </div>
   );
 }
