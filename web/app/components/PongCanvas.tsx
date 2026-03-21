@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { GameState } from "../hooks/useNeuralSocket";
+import type { TickMessage } from "../hooks/useNeuralSocket";
 
 interface PongCanvasProps {
-  gameState: GameState | null;
+  tickRef: React.RefObject<TickMessage | null>;
+  prevTickRef: React.RefObject<TickMessage | null>;
+  tickTimeRef: React.RefObject<number>;
   onPlayerInput: (y: number) => void;
 }
 
@@ -13,26 +15,17 @@ const PADDLE_HEIGHT = 0.15;
 const BALL_RADIUS = 0.01;
 const TICK_MS = 50;
 
-export default function PongCanvas({ gameState, onPlayerInput }: PongCanvasProps) {
+export default function PongCanvas({
+  tickRef,
+  prevTickRef,
+  tickTimeRef,
+  onPlayerInput,
+}: PongCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const stateRef = useRef<GameState | null>(null);
-  const prevStateRef = useRef<GameState | null>(null);
-  const lastTickTime = useRef(0);
   const onPlayerInputRef = useRef(onPlayerInput);
-
-  // Keep refs in sync without triggering re-renders
   onPlayerInputRef.current = onPlayerInput;
 
-  useEffect(() => {
-    if (gameState) {
-      prevStateRef.current = stateRef.current;
-      stateRef.current = gameState;
-      lastTickTime.current = performance.now();
-    }
-  }, [gameState]);
-
-  // Single stable effect for the entire render loop + input
   useEffect(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
@@ -68,7 +61,8 @@ export default function PongCanvas({ gameState, onPlayerInput }: PongCanvasProps
         return;
       }
 
-      const state = stateRef.current;
+      // Read directly from refs — no React in the loop
+      const state = tickRef.current?.game;
       if (!state) {
         animId = requestAnimationFrame(render);
         return;
@@ -77,18 +71,20 @@ export default function PongCanvas({ gameState, onPlayerInput }: PongCanvasProps
       const w = canvas!.width;
       const h = canvas!.height;
 
-      const elapsed = performance.now() - lastTickTime.current;
+      const elapsed = performance.now() - tickTimeRef.current;
       const t = Math.min(elapsed / TICK_MS, 2);
       const ballX = state.ball_x + state.ball_vx * t;
       const ballY = state.ball_y + state.ball_vy * t;
 
-      const prev = prevStateRef.current;
+      const prev = prevTickRef.current?.game;
       const lerpT = Math.min(elapsed / TICK_MS, 1);
       const neuralPaddleY = prev
-        ? prev.neural_paddle_y + (state.neural_paddle_y - prev.neural_paddle_y) * lerpT
+        ? prev.neural_paddle_y +
+          (state.neural_paddle_y - prev.neural_paddle_y) * lerpT
         : state.neural_paddle_y;
       const playerPaddleY = prev
-        ? prev.player_paddle_y + (state.player_paddle_y - prev.player_paddle_y) * lerpT
+        ? prev.player_paddle_y +
+          (state.player_paddle_y - prev.player_paddle_y) * lerpT
         : state.player_paddle_y;
 
       ctx.clearRect(0, 0, w, h);

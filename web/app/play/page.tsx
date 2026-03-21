@@ -136,7 +136,7 @@ function SetupGuide() {
 }
 
 export default function PlayPage() {
-  const { connected, latestTick, sendPlayerInput } = useNeuralSocket(WS_URL);
+  const { connected, latestTick, tickRef, prevTickRef, tickTimeRef, sendPlayerInput } = useNeuralSocket(WS_URL);
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-[#050508]">
@@ -159,7 +159,9 @@ export default function PlayPage() {
             <div className="flex-1 flex items-center justify-center p-4">
               <div className="w-full max-w-3xl aspect-[4/3] rounded-xl overflow-hidden border border-white/[0.06]">
                 <PongCanvas
-                  gameState={latestTick?.game ?? null}
+                  tickRef={tickRef}
+                  prevTickRef={prevTickRef}
+                  tickTimeRef={tickTimeRef}
                   onPlayerInput={sendPlayerInput}
                 />
               </div>

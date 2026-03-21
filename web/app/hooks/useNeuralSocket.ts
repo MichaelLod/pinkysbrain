@@ -36,7 +36,12 @@ export interface TickMessage {
 export function useNeuralSocket(url: string) {
   const wsRef = useRef<WebSocket | null>(null);
   const [connected, setConnected] = useState(false);
+  // State for UI components that don't need 60fps (analysis overlay, score)
   const [latestTick, setLatestTick] = useState<TickMessage | null>(null);
+  // Ref for the rAF render loop — bypasses React entirely
+  const tickRef = useRef<TickMessage | null>(null);
+  const prevTickRef = useRef<TickMessage | null>(null);
+  const tickTimeRef = useRef(0);
 
   useEffect(() => {
     const ws = new WebSocket(url);
@@ -49,6 +54,11 @@ export function useNeuralSocket(url: string) {
     ws.onmessage = (event) => {
       const msg = JSON.parse(event.data) as TickMessage;
       if (msg.type === "tick") {
+        // Update ref immediately (for rAF loop, no React overhead)
+        prevTickRef.current = tickRef.current;
+        tickRef.current = msg;
+        tickTimeRef.current = performance.now();
+        // Update state for React UI (batched, may be deferred)
         setLatestTick(msg);
       }
     };
@@ -66,5 +76,12 @@ export function useNeuralSocket(url: string) {
     }
   }, []);
 
-  return { connected, latestTick, sendPlayerInput };
+  return {
+    connected,
+    latestTick,
+    tickRef,
+    prevTickRef,
+    tickTimeRef,
+    sendPlayerInput,
+  };
 }
