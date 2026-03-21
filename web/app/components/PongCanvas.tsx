@@ -154,7 +154,7 @@ export default function PongCanvas({
 
   return (
     <div ref={containerRef} className="w-full h-full">
-      <canvas ref={canvasRef} className="w-full h-full cursor-none" />
+      <canvas ref={canvasRef} className="w-full h-full cursor-none" style={{ willChange: "contents" }} />
     </div>
   );
 }

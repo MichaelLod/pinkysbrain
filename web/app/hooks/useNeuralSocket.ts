@@ -46,6 +46,7 @@ export function useNeuralSocket(url: string) {
   useEffect(() => {
     const ws = new WebSocket(url);
     wsRef.current = ws;
+    let uiUpdateCounter = 0;
 
     ws.onopen = () => setConnected(true);
     ws.onclose = () => setConnected(false);
@@ -54,12 +55,16 @@ export function useNeuralSocket(url: string) {
     ws.onmessage = (event) => {
       const msg = JSON.parse(event.data) as TickMessage;
       if (msg.type === "tick") {
-        // Update ref immediately (for rAF loop, no React overhead)
+        // Update refs immediately (for rAF loop, no React overhead)
         prevTickRef.current = tickRef.current;
         tickRef.current = msg;
         tickTimeRef.current = performance.now();
-        // Update state for React UI (batched, may be deferred)
-        setLatestTick(msg);
+        // Throttle React state updates to ~4/sec (every 5th tick)
+        uiUpdateCounter++;
+        if (uiUpdateCounter >= 5) {
+          uiUpdateCounter = 0;
+          setLatestTick(msg);
+        }
       }
     };
 
