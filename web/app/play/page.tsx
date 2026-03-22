@@ -158,7 +158,7 @@ export default function PlayPage() {
 
       {/* Score overlay (HTML, updated by rAF loop via ref) */}
       {connected && (
-        <div className="absolute top-[18%] left-0 right-56 z-10 flex justify-center pointer-events-none">
+        <div className="absolute top-[18%] left-0 right-0 z-10 flex justify-center pointer-events-none">
           <div
             ref={scoreRef}
             className="text-zinc-400/60 font-mono text-lg tracking-widest"

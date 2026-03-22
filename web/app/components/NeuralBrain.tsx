@@ -88,13 +88,12 @@ export default function NeuralBrain({
     renderer.autoClear = false;
     container.appendChild(renderer.domElement);
 
-    // --- Pong scene (pure Three.js meshes, no Canvas 2D) ---
+    // --- Pong scene (pure Three.js meshes) ---
     let pongScene: THREE.Scene | null = null;
     let pongCamera: THREE.OrthographicCamera | null = null;
     let playerPaddle: THREE.Mesh | null = null;
     let neuralPaddle: THREE.Mesh | null = null;
     let ball: THREE.Mesh | null = null;
-    let centerLine: THREE.Line | null = null;
     let pongBg: THREE.Mesh | null = null;
 
     if (showPong && tickRef && prevTickRef && tickTimeRef) {
@@ -104,12 +103,10 @@ export default function NeuralBrain({
       pongCamera = new THREE.OrthographicCamera(-aspect, aspect, 1, -1, 0, 10);
       pongCamera.position.z = 1;
 
-      // Pong field dimensions in NDC-ish coords
       const fieldW = 1.4;
       const fieldH = 1.0;
-      const fieldX = -0.1; // offset left for sidebar
+      const fieldX = -0.1;
 
-      // Semi-transparent background
       const bgGeo = new THREE.PlaneGeometry(fieldW, fieldH);
       const bgMat = new THREE.MeshBasicMaterial({
         color: 0x050508,
@@ -120,7 +117,6 @@ export default function NeuralBrain({
       pongBg.position.set(fieldX, 0, 0);
       pongScene.add(pongBg);
 
-      // Center dashed line
       const linePoints = [];
       for (let y = -fieldH / 2; y < fieldH / 2; y += 0.04) {
         linePoints.push(new THREE.Vector3(fieldX, y, 0.01));
@@ -132,10 +128,8 @@ export default function NeuralBrain({
         transparent: true,
         opacity: 0.15,
       });
-      centerLine = new THREE.LineSegments(lineGeo, lineMat);
-      pongScene.add(centerLine);
+      pongScene.add(new THREE.LineSegments(lineGeo, lineMat));
 
-      // Player paddle (left, blue)
       const paddleGeo = new THREE.PlaneGeometry(0.02, 0.15);
       const playerMat = new THREE.MeshBasicMaterial({
         color: 0x64b4ff,
@@ -146,7 +140,6 @@ export default function NeuralBrain({
       playerPaddle.position.set(fieldX - fieldW / 2 + 0.04, 0, 0.01);
       pongScene.add(playerPaddle);
 
-      // Neural paddle (right, orange)
       const neuralMat = new THREE.MeshBasicMaterial({
         color: 0xff8c3c,
         transparent: true,
@@ -156,7 +149,6 @@ export default function NeuralBrain({
       neuralPaddle.position.set(fieldX + fieldW / 2 - 0.04, 0, 0.01);
       pongScene.add(neuralPaddle);
 
-      // Ball
       const ballGeo = new THREE.CircleGeometry(0.015, 16);
       const ballMat = new THREE.MeshBasicMaterial({
         color: 0xdce6ff,
@@ -167,7 +159,6 @@ export default function NeuralBrain({
       ball.position.set(fieldX, 0, 0.02);
       pongScene.add(ball);
 
-      // Mouse input
       const handleMouse = (e: MouseEvent) => {
         const rect = renderer.domElement.getBoundingClientRect();
         const y = (e.clientY - rect.top) / rect.height;
@@ -321,14 +312,12 @@ export default function NeuralBrain({
         ? prev.player_paddle_y + (state.player_paddle_y - prev.player_paddle_y) * lerpT
         : state.player_paddle_y;
 
-      // Map 0-1 game coords to Three.js coords
       ball.position.x = fieldX + (ballX - 0.5) * fieldW;
       ball.position.y = (0.5 - ballY) * fieldH;
 
       playerPaddle.position.y = (0.5 - playerY) * fieldH;
       neuralPaddle.position.y = (0.5 - neuralY) * fieldH;
 
-      // Update score via DOM (HTML overlay)
       if (scoreRef?.current) {
         scoreRef.current.textContent = `YOU ${state.player_score} : ${state.neural_score} NEURONS`;
       }
@@ -381,11 +370,9 @@ export default function NeuralBrain({
       brainScene.rotation.y = Math.sin(time * 0.15) * 0.3;
       brainScene.rotation.x = Math.sin(time * 0.1) * 0.05 - 0.1;
 
-      // Render brain
       renderer.clear();
       renderer.render(brainScene, camera);
 
-      // Render + update pong overlay
       if (showPong && pongScene && pongCamera) {
         updatePong();
         renderer.clearDepth();
@@ -395,7 +382,7 @@ export default function NeuralBrain({
       animationId = requestAnimationFrame(animate);
     }
 
-    animate();
+    animationId = requestAnimationFrame(animate);
 
     function handleResize() {
       camera.aspect = container.clientWidth / container.clientHeight;
@@ -420,5 +407,7 @@ export default function NeuralBrain({
     };
   }, [mode, showPong]);
 
-  return <div ref={containerRef} className="absolute inset-0 cursor-none" />;
+  return (
+    <div ref={containerRef} className={`absolute inset-0${showPong ? " cursor-none" : ""}`} />
+  );
 }

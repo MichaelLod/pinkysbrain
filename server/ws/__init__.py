@@ -67,19 +67,21 @@ async def game_session(websocket) -> None:
                     }
 
                     try:
-                        queue.put_nowait(message)
-                    except asyncio.QueueFull:
+                        loop.call_soon_threadsafe(queue.put_nowait, message)
+                    except (asyncio.QueueFull, RuntimeError):
                         pass
 
-            queue.put_nowait(None)
+            loop.call_soon_threadsafe(queue.put_nowait, None)
         except Exception as e:
             logger.error("Loop error: %s", e)
             try:
-                queue.put_nowait(None)
-            except asyncio.QueueFull:
+                loop.call_soon_threadsafe(queue.put_nowait, None)
+            except RuntimeError:
                 pass
 
-    loop_future = asyncio.get_event_loop().run_in_executor(None, run_loop)
+    loop = asyncio.get_event_loop()
+
+    loop_future = loop.run_in_executor(None, run_loop)
 
     try:
         while True:
