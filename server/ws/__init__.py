@@ -1,16 +1,34 @@
 import asyncio
 import json
 import logging
-
-import cl
+import os
 
 from server.analysis import FiringRateTracker
 from server.config import GAME_DURATION_SEC, TICKS_PER_SECOND, WS_HOST, WS_PORT
 from server.decoder import SpikeDecoder
-from server.encoder import encode_game_state
 from server.game import PongState
+from server.replay import open_replay
 
 logger = logging.getLogger(__name__)
+
+REPLAY_PATH = os.environ.get("REPLAY_PATH")
+
+
+def _open_neurons():
+    if REPLAY_PATH:
+        logger.info("Using replay file: %s", REPLAY_PATH)
+        return open_replay(REPLAY_PATH)
+    try:
+        import cl
+
+        return cl.open()
+    except Exception:
+        logger.info("CL SDK device not available, falling back to replay")
+        return open_replay()
+
+
+def _should_encode() -> bool:
+    return REPLAY_PATH is None and "cl" in __import__("sys").modules
 
 
 async def game_session(websocket) -> None:
@@ -39,7 +57,11 @@ async def game_session(websocket) -> None:
     def run_loop() -> None:
         nonlocal player_y
         try:
-            with cl.open() as neurons:
+            encode = _should_encode()
+            if encode:
+                from server.encoder import encode_game_state
+
+            with _open_neurons() as neurons:
                 for tick in neurons.loop(
                     ticks_per_second=TICKS_PER_SECOND,
                     stop_after_seconds=GAME_DURATION_SEC,
@@ -47,7 +69,8 @@ async def game_session(websocket) -> None:
                     spikes = tick.analysis.spikes
                     stims = tick.analysis.stims
 
-                    encode_game_state(neurons, game.ball_x, game.ball_y)
+                    if encode:
+                        encode_game_state(neurons, game.ball_x, game.ball_y)
 
                     direction = decoder.decode(spikes)
                     game.update(direction, player_y)
