@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import random
 import time
 from contextlib import contextmanager
@@ -12,7 +13,49 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
+DATA_DIR = Path(os.environ.get("DATA_DIR", Path(__file__).resolve().parent.parent.parent / "data"))
+
+
+def sync_from_bucket() -> None:
+    """Download recordings from Railway S3 bucket if DATA_DIR is empty."""
+    bucket = os.environ.get("BUCKET_NAME")
+    endpoint = os.environ.get("BUCKET_ENDPOINT")
+    access_key = os.environ.get("BUCKET_ACCESS_KEY_ID")
+    secret_key = os.environ.get("BUCKET_SECRET_ACCESS_KEY")
+
+    if not all([bucket, endpoint, access_key, secret_key]):
+        return
+
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    existing = list(DATA_DIR.glob("*.h5"))
+    if existing:
+        logger.info("Data dir already has %d recordings, skipping sync", len(existing))
+        return
+
+    import boto3
+    from botocore.config import Config
+
+    logger.info("Syncing recordings from bucket %s ...", bucket)
+    s3 = boto3.client(
+        "s3",
+        endpoint_url=endpoint,
+        aws_access_key_id=access_key,
+        aws_secret_access_key=secret_key,
+        region_name="auto",
+        config=Config(s3={"addressing_style": "virtual"}),
+    )
+
+    resp = s3.list_objects_v2(Bucket=bucket)
+    for obj in resp.get("Contents", []):
+        key = obj["Key"]
+        if not key.endswith(".h5"):
+            continue
+        dest = DATA_DIR / key
+        size_mb = obj["Size"] / (1024 * 1024)
+        logger.info("Downloading %s (%.0f MB)...", key, size_mb)
+        s3.download_file(bucket, key, str(dest))
+
+    logger.info("Sync complete: %d recordings", len(list(DATA_DIR.glob("*.h5"))))
 
 
 @dataclass(slots=True)
