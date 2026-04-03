@@ -1,8 +1,13 @@
 import { BALL_SPEED, PADDLE_HEIGHT } from "./config";
 import type { GameState } from "./types";
 
+export type PongEvent =
+  | { type: "hit"; side: "left" | "right" }
+  | { type: "miss"; side: "left" | "right" };
+
 /**
  * Pong state machine. Both paddles are neural-driven in two-brain mode.
+ * Returns events (hit/miss) so the match can apply reward/punishment.
  */
 export class PongGame {
   state: GameState;
@@ -20,7 +25,7 @@ export class PongGame {
     };
   }
 
-  update(leftDirection: number, rightDirection: number): void {
+  update(leftDirection: number, rightDirection: number): PongEvent | null {
     const s = this.state;
     const half = PADDLE_HEIGHT / 2;
 
@@ -44,9 +49,11 @@ export class PongGame {
         s.ballVx *= -1;
         const offset = (s.ballY - s.leftPaddleY) / half;
         s.ballVy = offset * BALL_SPEED;
+        return { type: "hit", side: "left" };
       } else if (s.ballX <= 0) {
         s.rightScore++;
         this.resetBall(1);
+        return { type: "miss", side: "left" };
       }
     }
 
@@ -56,11 +63,15 @@ export class PongGame {
         s.ballVx *= -1;
         const offset = (s.ballY - s.rightPaddleY) / half;
         s.ballVy = offset * BALL_SPEED;
+        return { type: "hit", side: "right" };
       } else if (s.ballX >= 1) {
         s.leftScore++;
         this.resetBall(-1);
+        return { type: "miss", side: "right" };
       }
     }
+
+    return null;
   }
 
   private resetBall(direction: number): void {

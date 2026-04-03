@@ -29,12 +29,16 @@ export interface GameState {
   rightScore: number;
 }
 
+export type StimMode = "organized" | "chaotic";
+
 export interface TickResult {
   game: GameState;
   leftSpikes: SpikeEvent[];
   rightSpikes: SpikeEvent[];
   leftStimChannels: number[];
   rightStimChannels: number[];
+  leftStimMode: StimMode;
+  rightStimMode: StimMode;
   leftAnalysis: AnalysisResult;
   rightAnalysis: AnalysisResult;
   leftDirection: number;

@@ -8,6 +8,7 @@ export type {
   TickResult,
   AnalysisResult,
   FeedConfig,
+  StimMode,
 } from "./types";
 export {
   GRID_SIZE,

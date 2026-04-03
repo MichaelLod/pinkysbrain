@@ -1,10 +1,10 @@
 import { TICKS_PER_SECOND, GAME_DURATION_SEC } from "./config";
 import { FiringRateTracker } from "./analysis";
 import { SpikeDecoder } from "./decoder";
-import { computeStimChannels } from "./encoder";
+import { computeStimChannels, computeChaoticStimChannels } from "./encoder";
 import { PongGame } from "./game";
 import { SpikeReplay } from "./replay";
-import type { FeedConfig, RecordingData, TickResult } from "./types";
+import type { FeedConfig, RecordingData, StimMode, TickResult } from "./types";
 
 export type MatchState = "idle" | "running" | "finished";
 
@@ -95,12 +95,28 @@ export class BrainMatch {
     const leftDirection = this.leftDecoder.decode(leftSpikes, this.leftFeed);
     const rightDirection = this.rightDecoder.decode(rightSpikes, this.rightFeed);
 
-    // Update game state
-    this.game.update(leftDirection, rightDirection);
+    // Update game state and check for hits/misses
+    const event = this.game.update(leftDirection, rightDirection);
 
-    // Compute stim channels for visualization
-    const leftStimChannels = computeStimChannels(this.game.state.ballX, this.game.state.ballY);
-    const rightStimChannels = computeStimChannels(this.game.state.ballX, this.game.state.ballY);
+    // Punishment: disrupt the decoder of whichever side missed
+    if (event?.type === "miss") {
+      if (event.side === "left") this.leftDecoder.punish();
+      else this.rightDecoder.punish();
+    }
+
+    // Stim visualization: organized (reward) vs chaotic (punishment)
+    const leftDisrupted = this.leftDecoder.disrupted;
+    const rightDisrupted = this.rightDecoder.disrupted;
+
+    const leftStimMode: StimMode = leftDisrupted ? "chaotic" : "organized";
+    const rightStimMode: StimMode = rightDisrupted ? "chaotic" : "organized";
+
+    const leftStimChannels = leftDisrupted
+      ? computeChaoticStimChannels()
+      : computeStimChannels(this.game.state.ballX, this.game.state.ballY);
+    const rightStimChannels = rightDisrupted
+      ? computeChaoticStimChannels()
+      : computeStimChannels(this.game.state.ballX, this.game.state.ballY);
 
     // Update analysis
     this.leftAnalysis.update(leftSpikes);
@@ -112,6 +128,8 @@ export class BrainMatch {
       rightSpikes,
       leftStimChannels,
       rightStimChannels,
+      leftStimMode,
+      rightStimMode,
       leftAnalysis: this.leftAnalysis.getRates(),
       rightAnalysis: this.rightAnalysis.getRates(),
       leftDirection,

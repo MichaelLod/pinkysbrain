@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
-import type { TickResult } from "../engine";
+import type { TickResult, StimMode } from "../engine";
 import { ACTIVE_CHANNELS, GRID_SIZE, EXCLUDED_CHANNELS } from "../engine";
 
 const CHANNEL_TO_INDEX = new Map<number, number>();
@@ -108,6 +108,7 @@ function updateElectrodes(
   electrodes: Electrode[],
   spikes: { channel: number }[],
   stimChannels: number[],
+  stimMode: StimMode,
   tintR: number,
   tintG: number,
   tintB: number,
@@ -131,6 +132,11 @@ function updateElectrodes(
     }
   }
 
+  // Chaotic stim: harsh red tint. Organized: normal orange.
+  const stimR = stimMode === "chaotic" ? 1.0 : 0.8;
+  const stimG = stimMode === "chaotic" ? 0.1 : 0.3;
+  const stimB = stimMode === "chaotic" ? 0.1 : -0.3;
+
   // Animate
   for (const electrode of electrodes) {
     electrode.activity +=
@@ -140,9 +146,9 @@ function updateElectrodes(
 
     const mat = electrode.mesh.material as THREE.MeshBasicMaterial;
     const stim = electrode.stimActivity;
-    const r = tintR * 0.3 + electrode.activity * 0.6 + stim * 0.8;
-    const g = tintG * 0.3 + electrode.activity * 0.5 + stim * 0.3;
-    const b = tintB * 0.3 + electrode.activity * 0.3 - stim * 0.3;
+    const r = tintR * 0.3 + electrode.activity * 0.6 + stim * stimR;
+    const g = tintG * 0.3 + electrode.activity * 0.5 + stim * stimG;
+    const b = tintB * 0.3 + electrode.activity * 0.3 + stim * stimB;
     mat.color.setRGB(Math.min(1, r), Math.min(1, g), Math.max(0, b));
     mat.opacity = 0.3 + Math.max(electrode.activity, stim) * 0.7;
 
@@ -268,12 +274,14 @@ export default function BrainMatchView({ tickRef, scoreRef }: BrainMatchViewProp
           leftElectrodes,
           tick.leftSpikes,
           tick.leftStimChannels,
+          tick.leftStimMode,
           0.15, 0.4, 0.8
         );
         updateElectrodes(
           rightElectrodes,
           tick.rightSpikes,
           tick.rightStimChannels,
+          tick.rightStimMode,
           0.8, 0.4, 0.15
         );
 
