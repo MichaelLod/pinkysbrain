@@ -44,7 +44,7 @@ function createBrainGroup(scene: THREE.Scene, offsetX: number): Electrode[] {
     const x = (col - (GRID_SIZE - 1) / 2) * 0.3;
     const z = (row - (GRID_SIZE - 1) / 2) * 0.3;
     const distFromCenter = Math.sqrt(x * x + z * z);
-    const y = Math.sqrt(Math.max(0, 1.6 - distFromCenter * distFromCenter)) * 0.4;
+    const y = Math.sqrt(Math.max(0, 1.6 - distFromCenter * distFromCenter)) * 0.15;
 
     const material = new THREE.MeshBasicMaterial({
       color: new THREE.Color(0.15, 0.4, 0.8),
@@ -168,7 +168,7 @@ export default function BrainMatchView({ tickRef, scoreRef }: BrainMatchViewProp
       0.1,
       100
     );
-    camera.position.set(0, 2.5, 6);
+    camera.position.set(0, 5.5, 2.5);
     camera.lookAt(0, 0, 0);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -288,9 +288,9 @@ export default function BrainMatchView({ tickRef, scoreRef }: BrainMatchViewProp
         }
       }
 
-      // Gentle rotation
-      brainScene.rotation.y = Math.sin(time * 0.12) * 0.15;
-      brainScene.rotation.x = Math.sin(time * 0.08) * 0.03 - 0.08;
+      // Subtle rotation — keep the grid readable from above
+      brainScene.rotation.y = Math.sin(time * 0.1) * 0.08;
+      brainScene.rotation.x = Math.sin(time * 0.07) * 0.02;
 
       renderer.clear();
       renderer.render(brainScene, camera);
