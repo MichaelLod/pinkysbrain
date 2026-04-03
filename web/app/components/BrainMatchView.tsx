@@ -35,7 +35,7 @@ interface BrainMatchViewProps {
 
 function createBrainGroup(scene: THREE.Scene, offsetX: number): Electrode[] {
   const electrodes: Electrode[] = [];
-  const geometry = new THREE.SphereGeometry(0.045, 12, 12);
+  const geometry = new THREE.SphereGeometry(0.045, 32, 32);
 
   for (let ch = 0; ch < GRID_SIZE * GRID_SIZE; ch++) {
     if (EXCLUDED_CHANNELS.has(ch)) continue;
