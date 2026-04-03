@@ -1,0 +1,47 @@
+[
+  {
+    "id": "monolayer_1",
+    "type": "monolayer",
+    "duration_sec": 300.0,
+    "duration_frames": 7500000,
+    "sampling_freq": 25000,
+    "channels": 64,
+    "spike_count": 95950
+  },
+  {
+    "id": "monolayer_2",
+    "type": "monolayer",
+    "duration_sec": 300.0,
+    "duration_frames": 7500000,
+    "sampling_freq": 25000,
+    "channels": 64,
+    "spike_count": 11809
+  },
+  {
+    "id": "monolayer_3",
+    "type": "monolayer",
+    "duration_sec": 300.0,
+    "duration_frames": 7500000,
+    "sampling_freq": 25000,
+    "channels": 64,
+    "spike_count": 2468
+  },
+  {
+    "id": "organoid_1",
+    "type": "organoid",
+    "duration_sec": 300.0,
+    "duration_frames": 7500000,
+    "sampling_freq": 25000,
+    "channels": 64,
+    "spike_count": 127175
+  },
+  {
+    "id": "organoid_2",
+    "type": "organoid",
+    "duration_sec": 300.0,
+    "duration_frames": 7500000,
+    "sampling_freq": 25000,
+    "channels": 64,
+    "spike_count": 5685
+  }
+]

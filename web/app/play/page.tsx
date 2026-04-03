@@ -1,132 +1,230 @@
 "use client";
 
-import { useRef } from "react";
-import { useNeuralSocket } from "../hooks/useNeuralSocket";
-import NeuralBrain from "../components/NeuralBrain";
-import AnalysisOverlay from "../components/AnalysisOverlay";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import BrainMatchView from "../components/BrainMatchView";
+import { BrainMatch, DEFAULT_FEED, GAME_DURATION_SEC } from "../engine";
+import type { RecordingMeta, RecordingData, FeedConfig, TickResult } from "../engine";
 
-const WS_URL =
-  process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8765";
+const TYPE_INFO: Record<string, { label: string; desc: string; color: string }> = {
+  monolayer: {
+    label: "Monolayer",
+    desc: "Flat sheet of neurons. Sparser firing, more organized.",
+    color: "text-blue-400",
+  },
+  organoid: {
+    label: "Organoid",
+    desc: "3D neural cluster. Dense, chaotic activity.",
+    color: "text-orange-400",
+  },
+};
 
-function SetupGuide() {
+const SPATIAL_FILTERS: { value: FeedConfig["spatialFilter"]; label: string }[] = [
+  { value: "full", label: "Full Array" },
+  { value: "top", label: "Top Half" },
+  { value: "bottom", label: "Bottom Half" },
+  { value: "left", label: "Left Half" },
+  { value: "right", label: "Right Half" },
+  { value: "center", label: "Center" },
+  { value: "edges", label: "Edges" },
+];
+
+async function loadIndex(): Promise<RecordingMeta[]> {
+  const res = await fetch("/recordings/index.json");
+  return res.json();
+}
+
+async function loadRecording(id: string): Promise<RecordingData> {
+  const res = await fetch(`/recordings/${id}.json`);
+  return res.json();
+}
+
+function RecordingCard({
+  rec,
+  selected,
+  onSelect,
+  side,
+}: {
+  rec: RecordingMeta;
+  selected: boolean;
+  onSelect: () => void;
+  side: "left" | "right";
+}) {
+  const info = TYPE_INFO[rec.type] ?? TYPE_INFO.monolayer;
+  const borderColor = selected
+    ? side === "left"
+      ? "border-blue-400/40"
+      : "border-orange-400/40"
+    : "border-white/[0.06]";
+  const bgColor = selected ? "bg-white/[0.06]" : "bg-white/[0.03]";
+
+  return (
+    <button
+      onClick={onSelect}
+      className={`${bgColor} border ${borderColor} backdrop-blur-sm rounded-lg p-4 hover:bg-white/[0.06] transition-all text-left w-full`}
+    >
+      <div className={`font-medium text-sm ${info.color}`}>{info.label}</div>
+      <div className="text-zinc-500 text-xs font-mono">{rec.id}</div>
+      <div className="text-zinc-500 text-xs mt-1">
+        {rec.spike_count.toLocaleString()} spikes
+      </div>
+    </button>
+  );
+}
+
+function FeedControls({
+  feed,
+  onChange,
+  side,
+  label,
+}: {
+  feed: FeedConfig;
+  onChange: (f: FeedConfig) => void;
+  side: "left" | "right";
+  label: string;
+}) {
+  const accent = side === "left" ? "text-blue-400" : "text-orange-400";
+
+  return (
+    <div className="bg-white/[0.03] border border-white/[0.06] backdrop-blur-sm rounded-xl p-4 font-mono text-xs space-y-3">
+      <div className={`${accent} uppercase tracking-widest text-[10px]`}>
+        {label}
+      </div>
+
+      <div>
+        <div className="text-zinc-500 mb-1">Region</div>
+        <select
+          value={feed.spatialFilter}
+          onChange={(e) =>
+            onChange({ ...feed, spatialFilter: e.target.value as FeedConfig["spatialFilter"] })
+          }
+          className="w-full bg-black/40 border border-white/10 rounded px-2 py-1 text-zinc-300 text-xs"
+        >
+          {SPATIAL_FILTERS.map((f) => (
+            <option key={f.value} value={f.value}>
+              {f.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <div className="text-zinc-500 mb-1">
+          Gain: {feed.gain.toFixed(1)}x
+        </div>
+        <input
+          type="range"
+          min="0.5"
+          max="3"
+          step="0.1"
+          value={feed.gain}
+          onChange={(e) => onChange({ ...feed, gain: parseFloat(e.target.value) })}
+          className="w-full accent-current"
+        />
+      </div>
+
+      <div>
+        <div className="text-zinc-500 mb-1">
+          Start: {feed.timeOffset}s
+        </div>
+        <input
+          type="range"
+          min="0"
+          max="240"
+          step="10"
+          value={feed.timeOffset}
+          onChange={(e) =>
+            onChange({ ...feed, timeOffset: parseInt(e.target.value) })
+          }
+          className="w-full accent-current"
+        />
+      </div>
+    </div>
+  );
+}
+
+function SelectionScreen({
+  recordings,
+  onStart,
+}: {
+  recordings: RecordingMeta[];
+  onStart: (leftId: string, rightId: string) => void;
+}) {
+  const [leftId, setLeftId] = useState<string | null>(null);
+  const [rightId, setRightId] = useState<string | null>(null);
+
+  const canStart = leftId && rightId;
+
   return (
     <div className="flex items-center justify-center min-h-screen px-6 py-12">
-      <div className="max-w-xl w-full">
-        <div className="text-center mb-12">
+      <div className="max-w-3xl w-full">
+        <div className="text-center mb-10">
           <h1 className="text-3xl sm:text-4xl font-bold text-white mb-3">
-            Grow your own brain
+            Two Brains Enter
           </h1>
-          <p className="text-zinc-400 text-sm font-mono">
-            Run a neural simulator on your machine. Play Pong against it.
+          <p className="text-zinc-400 text-sm font-mono mb-4">
+            Pick two neural recordings. They play Pong. You control what they see.
+          </p>
+          <p className="text-zinc-500 text-xs max-w-md mx-auto leading-relaxed">
+            Each recording is from real human neurons grown on a chip — stem-cell-derived
+            cortical cells firing electrical spikes on a 64-channel electrode array.
+            Choose a monolayer (flat, organized) or organoid (3D, chaotic) for each side.
           </p>
         </div>
 
-        <div className="space-y-6">
-          {/* Step 1 */}
-          <div className="bg-white/[0.03] border border-white/[0.06] backdrop-blur-sm rounded-xl p-6">
-            <div className="flex items-start gap-4">
-              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-500/20 border border-blue-400/20 flex items-center justify-center text-blue-400 font-mono text-sm font-bold">
-                1
-              </div>
-              <div className="flex-1">
-                <h3 className="text-white font-medium mb-1">
-                  Clone the repo
-                </h3>
-                <p className="text-zinc-500 text-xs mb-3">
-                  Grab the source and install dependencies
-                </p>
-                <div className="bg-black/40 rounded-lg p-3 font-mono text-sm space-y-1">
-                  <div className="text-zinc-400">
-                    <span className="text-zinc-600 select-none">$ </span>
-                    <span className="text-blue-300">git clone</span>{" "}
-                    https://github.com/MichaelLod/pinkysbrain.git
-                  </div>
-                  <div className="text-zinc-400">
-                    <span className="text-zinc-600 select-none">$ </span>
-                    <span className="text-blue-300">cd</span> pinkysbrain
-                  </div>
-                  <div className="text-zinc-400">
-                    <span className="text-zinc-600 select-none">$ </span>
-                    <span className="text-blue-300">pip install</span> -r
-                    requirements.txt
-                  </div>
-                </div>
-              </div>
+        <div className="grid grid-cols-2 gap-8 mb-8">
+          <div>
+            <div className="text-blue-400 font-mono text-xs uppercase tracking-widest mb-3">
+              Left Brain
+            </div>
+            <div className="space-y-2">
+              {recordings.map((rec) => (
+                <RecordingCard
+                  key={rec.id}
+                  rec={rec}
+                  selected={leftId === rec.id}
+                  onSelect={() => setLeftId(rec.id)}
+                  side="left"
+                />
+              ))}
             </div>
           </div>
-
-          {/* Step 2 */}
-          <div className="bg-white/[0.03] border border-white/[0.06] backdrop-blur-sm rounded-xl p-6">
-            <div className="flex items-start gap-4">
-              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-500/20 border border-blue-400/20 flex items-center justify-center text-blue-400 font-mono text-sm font-bold">
-                2
-              </div>
-              <div className="flex-1">
-                <h3 className="text-white font-medium mb-1">
-                  Start the brain
-                </h3>
-                <p className="text-zinc-500 text-xs mb-3">
-                  This spins up 800K simulated neurons on your machine
-                </p>
-                <div className="bg-black/40 rounded-lg p-3 font-mono text-sm">
-                  <div className="text-zinc-400">
-                    <span className="text-zinc-600 select-none">$ </span>
-                    <span className="text-blue-300">python -m</span> server
-                  </div>
-                  <div className="text-green-400/60 text-xs mt-2">
-                    Starting pinkysbrain server on localhost:8765
-                  </div>
-                </div>
-              </div>
+          <div>
+            <div className="text-orange-400 font-mono text-xs uppercase tracking-widest mb-3">
+              Right Brain
             </div>
-          </div>
-
-          {/* Step 3 */}
-          <div className="bg-white/[0.03] border border-white/[0.06] backdrop-blur-sm rounded-xl p-6">
-            <div className="flex items-start gap-4">
-              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-orange-500/20 border border-orange-400/20 flex items-center justify-center text-orange-400 font-mono text-sm font-bold">
-                3
-              </div>
-              <div className="flex-1">
-                <h3 className="text-white font-medium mb-1">
-                  Come back here
-                </h3>
-                <p className="text-zinc-500 text-xs mb-3">
-                  This page auto-connects when it detects your local brain
-                </p>
-                <div className="flex items-center gap-3 mt-4">
-                  <div className="w-2 h-2 rounded-full bg-zinc-600 animate-pulse" />
-                  <span className="text-zinc-500 font-mono text-xs">
-                    Listening for neural connection on localhost:8765...
-                  </span>
-                </div>
-              </div>
+            <div className="space-y-2">
+              {recordings.map((rec) => (
+                <RecordingCard
+                  key={rec.id}
+                  rec={rec}
+                  selected={rightId === rec.id}
+                  onSelect={() => setRightId(rec.id)}
+                  side="right"
+                />
+              ))}
             </div>
           </div>
         </div>
 
-        <div className="mt-8 text-center space-y-4">
-          <p className="text-zinc-600 text-xs font-mono">
-            Requires Python 3.12+
-          </p>
-          <div className="flex items-center justify-center gap-4">
-            <a
-              href="https://github.com/MichaelLod/pinkysbrain"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 text-zinc-500 hover:text-zinc-300 transition-colors text-xs font-mono"
-            >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
-              </svg>
-              View source
-            </a>
+        <div className="text-center space-y-4">
+          <button
+            onClick={() => canStart && onStart(leftId!, rightId!)}
+            disabled={!canStart}
+            className={`px-8 py-3 rounded-full font-mono text-sm transition-all ${
+              canStart
+                ? "bg-white/10 border border-white/20 text-white hover:bg-white/15"
+                : "bg-white/[0.03] border border-white/[0.06] text-zinc-600 cursor-not-allowed"
+            }`}
+          >
+            Start Match
+          </button>
+          <div>
             <Link
               href="/"
-              className="text-zinc-500 hover:text-zinc-300 transition-colors text-xs font-mono"
+              className="text-zinc-500 hover:text-zinc-300 transition-colors font-mono text-xs"
             >
-              Learn more
+              &larr; back
             </Link>
           </div>
         </div>
@@ -136,87 +234,182 @@ function SetupGuide() {
 }
 
 export default function PlayPage() {
-  const { connected, latestTick, tickRef, prevTickRef, tickTimeRef, sendPlayerInput } = useNeuralSocket(WS_URL);
+  const [recordings, setRecordings] = useState<RecordingMeta[]>([]);
+  const [phase, setPhase] = useState<"loading" | "select" | "playing" | "finished">("loading");
+  const [match, setMatch] = useState<BrainMatch | null>(null);
+  const [leftFeed, setLeftFeed] = useState<FeedConfig>({ ...DEFAULT_FEED });
+  const [rightFeed, setRightFeed] = useState<FeedConfig>({ ...DEFAULT_FEED });
+  const [latestTick, setLatestTick] = useState<TickResult | null>(null);
+  const [leftMeta, setLeftMeta] = useState<RecordingMeta | null>(null);
+  const [rightMeta, setRightMeta] = useState<RecordingMeta | null>(null);
+
+  const tickRef = useRef<TickResult | null>(null);
   const scoreRef = useRef<HTMLDivElement>(null);
+  const uiCounter = useRef(0);
+
+  useEffect(() => {
+    loadIndex().then((recs) => {
+      setRecordings(recs);
+      setPhase("select");
+    });
+  }, []);
+
+  const handleStart = useCallback(
+    async (leftId: string, rightId: string) => {
+      setPhase("loading");
+      const [leftData, rightData] = await Promise.all([
+        loadRecording(leftId),
+        loadRecording(rightId),
+      ]);
+      setLeftMeta(leftData.meta);
+      setRightMeta(rightData.meta);
+
+      const m = new BrainMatch(leftData, rightData);
+
+      m.on("tick", (tick) => {
+        tickRef.current = tick;
+        // Throttle React state to ~4/sec
+        uiCounter.current++;
+        if (uiCounter.current >= 5) {
+          uiCounter.current = 0;
+          setLatestTick(tick);
+        }
+      });
+
+      m.on("finish", () => {
+        setPhase("finished");
+      });
+
+      setMatch(m);
+      setPhase("playing");
+      m.start();
+    },
+    []
+  );
+
+  // Sync feed config changes to match
+  useEffect(() => {
+    if (match) match.leftFeed = leftFeed;
+  }, [match, leftFeed]);
+
+  useEffect(() => {
+    if (match) match.rightFeed = rightFeed;
+  }, [match, rightFeed]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => { match?.stop(); };
+  }, [match]);
+
+  if (phase === "loading") {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-zinc-500 font-mono text-sm animate-pulse">
+          Loading neural recordings...
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "select") {
+    return <SelectionScreen recordings={recordings} onStart={handleStart} />;
+  }
+
+  const leftLabel = leftMeta ? `${leftMeta.type} (${leftMeta.id})` : "Left";
+  const rightLabel = rightMeta ? `${rightMeta.type} (${rightMeta.id})` : "Right";
+
+  const elapsed = match ? Math.floor(match.tickCount / 20) : 0;
+  const remaining = GAME_DURATION_SEC - elapsed;
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-[#050508]">
-      {/* 3D brain + Pong (single WebGL renderer, all meshes) */}
+      {/* 3D renderer */}
       <div className="absolute inset-0 z-0">
-        <NeuralBrain
-          mode={connected ? "live" : "demo"}
-          spikeData={latestTick?.spikes}
-          stimData={latestTick?.stims}
-          showPong={connected}
-          tickRef={tickRef}
-          prevTickRef={prevTickRef}
-          tickTimeRef={tickTimeRef}
-          onPlayerInput={sendPlayerInput}
-          scoreRef={scoreRef}
-        />
+        <BrainMatchView tickRef={tickRef} scoreRef={scoreRef} />
       </div>
 
-      {/* Score overlay (HTML, updated by rAF loop via ref) */}
-      {connected && (
-        <div className="absolute top-[18%] left-0 right-0 z-10 flex justify-center pointer-events-none">
+      {/* Score + timer */}
+      <div className="absolute top-6 left-0 right-0 z-10 flex flex-col items-center pointer-events-none">
+        <div className="flex items-center gap-6 mb-1">
+          <span className="text-blue-400 font-mono text-xs uppercase tracking-widest">
+            {leftMeta?.type ?? "left"}
+          </span>
           <div
             ref={scoreRef}
-            className="text-zinc-400/60 font-mono text-lg tracking-widest"
+            className="text-white font-mono text-2xl tracking-widest"
           >
-            YOU 0 : 0 NEURONS
+            0 : 0
           </div>
+          <span className="text-orange-400 font-mono text-xs uppercase tracking-widest">
+            {rightMeta?.type ?? "right"}
+          </span>
         </div>
-      )}
+        <div className="text-zinc-600 font-mono text-xs">
+          {remaining > 0 ? `${remaining}s` : "finished"}
+        </div>
+      </div>
 
-      {/* Content layer */}
-      <div className="relative z-20 h-full pointer-events-none">
-        {connected ? (
-          <div className="flex h-full justify-end">
-            {/* Analysis sidebar */}
-            <div className="w-56 p-4 flex flex-col gap-4 pointer-events-auto">
-              <Link
-                href="/"
-                className="text-zinc-500 hover:text-zinc-300 transition-colors font-mono text-xs"
-              >
-                &larr; back
-              </Link>
-
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-green-500" />
-                <span className="font-mono text-xs text-zinc-400">
-                  Connected
-                </span>
-              </div>
-
-              <AnalysisOverlay
-                analysis={latestTick?.analysis ?? null}
-                spikeCount={latestTick?.spikes.length ?? 0}
-                neuralDirection={latestTick?.neural_direction ?? 0}
-              />
-
-              {latestTick && (
-                <div className="bg-white/[0.03] border border-white/[0.06] backdrop-blur-sm rounded-xl p-4 font-mono text-xs">
-                  <div className="text-orange-400 uppercase tracking-widest text-[10px] mb-3">
-                    Score
-                  </div>
-                  <div className="flex justify-between text-zinc-300">
-                    <span>You</span>
-                    <span className="text-lg">
-                      {latestTick.game.player_score}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-zinc-300">
-                    <span>Neurons</span>
-                    <span className="text-lg">
-                      {latestTick.game.neural_score}
-                    </span>
-                  </div>
-                </div>
-              )}
+      {/* Left feed controls */}
+      <div className="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-44">
+        <FeedControls
+          feed={leftFeed}
+          onChange={setLeftFeed}
+          side="left"
+          label={leftLabel}
+        />
+        {latestTick && (
+          <div className="mt-2 bg-white/[0.03] border border-white/[0.06] rounded-xl p-3 font-mono text-xs">
+            <div className="text-zinc-500">
+              Rate: {latestTick.leftAnalysis.meanRate} Hz
+            </div>
+            <div className="text-zinc-500">
+              Spikes/tick: {latestTick.leftSpikes.length}
             </div>
           </div>
-        ) : (
-          <SetupGuide />
+        )}
+      </div>
+
+      {/* Right feed controls */}
+      <div className="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-44">
+        <FeedControls
+          feed={rightFeed}
+          onChange={setRightFeed}
+          side="right"
+          label={rightLabel}
+        />
+        {latestTick && (
+          <div className="mt-2 bg-white/[0.03] border border-white/[0.06] rounded-xl p-3 font-mono text-xs">
+            <div className="text-zinc-500">
+              Rate: {latestTick.rightAnalysis.meanRate} Hz
+            </div>
+            <div className="text-zinc-500">
+              Spikes/tick: {latestTick.rightSpikes.length}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Back + play again */}
+      <div className="absolute bottom-6 left-0 right-0 z-20 flex justify-center gap-4">
+        <Link
+          href="/"
+          className="text-zinc-500 hover:text-zinc-300 transition-colors font-mono text-xs"
+        >
+          &larr; back
+        </Link>
+        {phase === "finished" && (
+          <button
+            onClick={() => {
+              match?.stop();
+              setMatch(null);
+              setLatestTick(null);
+              tickRef.current = null;
+              setPhase("select");
+            }}
+            className="text-blue-400 hover:text-blue-300 transition-colors font-mono text-xs"
+          >
+            new match &rarr;
+          </button>
         )}
       </div>
     </div>

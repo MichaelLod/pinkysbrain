@@ -17,8 +17,14 @@ export default function Home() {
             <span className="text-white">brain</span>
           </h1>
 
-          <p className="animate-fade-in-up delay-200 text-lg sm:text-xl text-zinc-400 mb-10 font-mono">
-            Play against living neurons. Watch them think.
+          <p className="animate-fade-in-up delay-200 text-lg sm:text-xl text-zinc-400 mb-4 font-mono">
+            Two lab-grown brains. One game of Pong. You decide who wins.
+          </p>
+          <p className="animate-fade-in-up delay-300 text-sm text-zinc-500 mb-10 max-w-lg mx-auto leading-relaxed">
+            Real human neurons on a 64-electrode chip fire electrical spikes
+            just like cells in your cortex. Pick two neural recordings, tune
+            what each brain sees, and watch them compete. No simulation —
+            every spike is from real biology.
           </p>
 
           <div className="animate-fade-in-up delay-400 flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
@@ -44,49 +50,61 @@ export default function Home() {
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M8 5v14l11-7z" />
               </svg>
-              Play Pong
+              Start a Match
             </a>
           </div>
 
           <div className="animate-fade-in-up delay-600 grid grid-cols-1 sm:grid-cols-3 gap-6 text-left">
             <div className="p-5 rounded-xl bg-white/[0.03] border border-white/[0.06] backdrop-blur-sm">
               <div className="text-blue-400 font-mono text-xs mb-2 uppercase tracking-widest">
-                Input
+                The Cells
               </div>
               <p className="text-sm text-zinc-400">
-                Game state encoded as electrical stimulation patterns across a
-                59-channel electrode array
+                Human neurons derived from stem cells, grown on a
+                64-channel multi-electrode array. Same cell type
+                as in your cortex.
               </p>
             </div>
             <div className="p-5 rounded-xl bg-white/[0.03] border border-white/[0.06] backdrop-blur-sm">
               <div className="text-blue-400 font-mono text-xs mb-2 uppercase tracking-widest">
-                Brain
+                The Signal
               </div>
               <p className="text-sm text-zinc-400">
-                800,000 lab-grown human neurons respond with spike cascades and
-                wave patterns
+                Neurons fire electrical spikes — action potentials — recorded at
+                25,000 samples per second across the array. Real biology, not a
+                simulation.
               </p>
             </div>
             <div className="p-5 rounded-xl bg-white/[0.03] border border-white/[0.06] backdrop-blur-sm">
               <div className="text-blue-400 font-mono text-xs mb-2 uppercase tracking-widest">
-                Output
+                The Match
               </div>
               <p className="text-sm text-zinc-400">
-                Population spike patterns decoded into game actions — the
-                neurons play back
+                Two recordings drive two paddles. You control what
+                each brain &ldquo;sees&rdquo; — spatial region, gain,
+                timing. Train your brain to win.
               </p>
             </div>
           </div>
 
           <div className="animate-fade-in-up delay-800 mt-12 text-zinc-600 text-xs font-mono">
-            Built on the{" "}
+            Neural recordings by{" "}
+            <a
+              href="https://corticallabs.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-zinc-500 hover:text-blue-400 transition-colors"
+            >
+              Cortical Labs
+            </a>
+            {" "}&middot; Built on the{" "}
             <a
               href="https://github.com/Cortical-Labs/cl-sdk"
               target="_blank"
               rel="noopener noreferrer"
               className="text-zinc-500 hover:text-blue-400 transition-colors"
             >
-              Cortical Labs CL SDK
+              CL SDK
             </a>
           </div>
         </div>

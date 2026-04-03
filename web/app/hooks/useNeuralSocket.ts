@@ -33,9 +33,26 @@ export interface TickMessage {
   neural_direction: number;
 }
 
+export interface RecordingMetadata {
+  id: string;
+  type: "monolayer" | "organoid" | "unknown";
+  duration_sec: number;
+  spike_count: number;
+  sampling_freq: number;
+  channels: number;
+}
+
+export interface GameOverMessage {
+  type: "game_over";
+  final_game: GameState;
+}
+
 export function useNeuralSocket(url: string) {
   const wsRef = useRef<WebSocket | null>(null);
   const [connected, setConnected] = useState(false);
+  const [gameActive, setGameActive] = useState(false);
+  const [currentRecording, setCurrentRecording] = useState<RecordingMetadata | null>(null);
+  const [recordings, setRecordings] = useState<RecordingMetadata[]>([]);
   // State for UI components that don't need 60fps (analysis overlay, score)
   const [latestTick, setLatestTick] = useState<TickMessage | null>(null);
   // Ref for the rAF render loop — bypasses React entirely
@@ -49,22 +66,34 @@ export function useNeuralSocket(url: string) {
     let uiUpdateCounter = 0;
 
     ws.onopen = () => setConnected(true);
-    ws.onclose = () => setConnected(false);
-    ws.onerror = () => setConnected(false);
+    ws.onclose = () => {
+      setConnected(false);
+      setGameActive(false);
+    };
+    ws.onerror = () => {
+      setConnected(false);
+      setGameActive(false);
+    };
 
     ws.onmessage = (event) => {
-      const msg = JSON.parse(event.data) as TickMessage;
-      if (msg.type === "tick") {
+      const msg = JSON.parse(event.data);
+
+      if (msg.type === "recordings_available") {
+        setRecordings(msg.recordings);
+      } else if (msg.type === "tick") {
+        setGameActive(true);
         // Update refs immediately (for rAF loop, no React overhead)
         prevTickRef.current = tickRef.current;
-        tickRef.current = msg;
+        tickRef.current = msg as TickMessage;
         tickTimeRef.current = performance.now();
         // Throttle React state updates to ~4/sec (every 5th tick)
         uiUpdateCounter++;
         if (uiUpdateCounter >= 5) {
           uiUpdateCounter = 0;
-          setLatestTick(msg);
+          setLatestTick(msg as TickMessage);
         }
+      } else if (msg.type === "game_over") {
+        setGameActive(false);
       }
     };
 
@@ -81,12 +110,27 @@ export function useNeuralSocket(url: string) {
     }
   }, []);
 
+  const selectRecording = useCallback((recordingId: string) => {
+    const ws = wsRef.current;
+    if (ws?.readyState === WebSocket.OPEN) {
+      const rec = recordings.find(r => r.id === recordingId);
+      if (rec) {
+        setCurrentRecording(rec);
+        ws.send(JSON.stringify({ type: "select_recording", recording_id: recordingId }));
+      }
+    }
+  }, [recordings]);
+
   return {
     connected,
+    gameActive,
     latestTick,
     tickRef,
     prevTickRef,
     tickTimeRef,
     sendPlayerInput,
+    recordings,
+    currentRecording,
+    selectRecording,
   };
 }

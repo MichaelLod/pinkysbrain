@@ -1,201 +1,158 @@
 # pinkysbrain
 
-**Play against living neurons. Watch them think.**
+**Two lab-grown brains. One game of Pong. You decide who wins.**
 
-🌐 [pinkysbrain.xyz](https://pinkysbrain.xyz)
+[pinkysbrain.xyz](https://pinkysbrain.xyz)
 
-A browser-based platform where humans play classic games against real neural recordings from biological computers. Every spike, every wave, every decision — visualized on a 3D brain in real time.
-
-Built on top of the [Cortical Labs CL SDK](https://github.com/Cortical-Labs/cl-sdk).
+Pick two neural recordings from real human neurons, tune what each brain "sees," and watch them compete at Pong. Every spike is from real biology — no simulation.
 
 ---
 
-## The Concept
+## What Are These Neurons?
 
-The CL1 biological computer is real. 800,000 lab-grown human neurons on a chip, learning through plasticity, making decisions through spike patterns. The DishBrain paper proved neurons can learn Pong. The doom-neuron project proved the community wants to interact with this.
+The recordings come from [Cortical Labs](https://corticallabs.com)' CL1 biological computing platform.
 
-What's missing: **a place where anyone can experience it.**
+Human **induced pluripotent stem cells** (iPSCs) are differentiated into cortical neurons — the same cell type that makes up your cerebral cortex. These neurons are cultured on a **multi-electrode array** (MEA): a chip with 64 electrodes arranged in an 8x8 grid. Over weeks, the cells form synaptic connections and begin firing **action potentials** (spikes) — the same electrical signals that carry information in a biological brain.
 
-pinkysbrain is that place.
+The MEA records this activity at **25,000 samples per second** across all 64 channels simultaneously.
 
-You open a browser. You see a 3D brain — 59 electrodes mapped onto a neural surface. You pick a game. You play against the neurons. As the game runs, you watch the brain respond in real time: stimulation pulses ripple across the surface, spike cascades light up regions, wave patterns emerge as the neurons "decide" their next move. After each round, a neuroscience dashboard breaks down what just happened — firing rates, connectivity graphs, criticality analysis.
+### Two Types of Cultures
 
-> "I just lost at Pong to 800,000 human neurons."
+| Type | Structure | Behavior |
+|------|-----------|----------|
+| **Monolayer** | Flat sheet of neurons grown directly on the electrode surface | Sparser firing, more spatially organized patterns |
+| **Organoid** | 3D cluster of neurons with layered structure resembling cortical tissue | Dense, chaotic activity with complex burst dynamics |
 
-That's a tweet. That's a TikTok. That's a headline.
+The platform includes 5 recordings: 3 monolayer and 2 organoid, each 5 minutes long.
+
+### Why This Resembles a Brain
+
+These are **real human cells** exhibiting the same fundamental properties as neurons in your brain:
+
+- **Action potentials** — all-or-nothing electrical spikes, the universal signaling mechanism of neurons
+- **Synaptic networks** — the cells form excitatory and inhibitory connections, self-organizing into functional circuits
+- **Spontaneous activity** — the cultures fire without external input, producing bursts and oscillations also observed in developing cortical tissue
+- **Population dynamics** — groups of neurons fire together in coordinated waves, just as neural populations do in vivo
+
+The key differences: much smaller scale (~800,000 cells vs ~86 billion in a full brain), no sensory input, no vascular system, and no large-scale architecture. But at the cellular level, the biophysics is the same.
 
 ## How It Works
 
+Everything runs **client-side in the browser**. No backend server needed during gameplay.
+
 ```
-┌─────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│  Game State  │────▶│  Stim Encoder    │────▶│  Neural Data    │
-│  (Browser)   │     │  (Input Layer)   │     │  (CL SDK)       │
-└──────┬───────┘     └──────────────────┘     └────────┬────────┘
-       │                                               │
-       │              ┌──────────────────┐             │
-       │◀─────────────│  Spike Decoder   │◀────────────┘
-       │              │  (Output Layer)  │
-       │              └──────────────────┘
-       ▼
-┌──────────────┐     ┌──────────────────┐
-│  3D Brain    │◀────│  Analysis Engine  │
-│  (Three.js)  │     │  (CL SDK)        │
-└──────────────┘     └──────────────────┘
+1. Browser loads spike data (compact JSON, ~1-2 MB per recording)
+2. You pick two recordings — one for each paddle
+3. Game loop runs at 20Hz in JavaScript:
+   - Read spikes for this tick from each recording
+   - Decode spike patterns → paddle direction (per your feed settings)
+   - Update Pong physics
+   - Compute stim channels for visualization
+4. Three.js renders two brains + Pong at 60fps
 ```
 
-### Input: Game → Neurons
+### The Feed Controls
 
-Game state is encoded as electrical stimulation patterns across the 59-channel electrode array. For Pong: ball position maps to spatial regions on the MEA. The stimulation design follows CL SDK conventions — biphasic waveforms, charge-balanced, within the 3.0 µA / 3.0 nC safety limits.
+You don't move a paddle — both paddles are driven by neural recordings. Instead, you act as a **trainer**: adjusting how each brain's signals are interpreted.
 
-### Processing: Neural Response
+| Control | What It Does |
+|---------|-------------|
+| **Region** | Which part of the 8x8 electrode array drives the decoder (full, top, bottom, center, edges, etc.) |
+| **Gain** | Decoder sensitivity (0.5x to 3.0x) — higher gain = more responsive but more erratic |
+| **Start Time** | Which segment of the 5-minute recording to replay from — different windows have different activity patterns |
 
-The neurons respond. In replay mode, we play back real CL1 recordings captured during actual gameplay sessions. The CL SDK provides the full data pipeline: raw samples (25 kHz, 64 channels), detected spikes (75-sample waveforms), and delivered stims — all with precise timestamps.
+### Decoding: Spikes to Paddle
 
-### Output: Spikes → Action
+The decoder divides the MEA grid into upper and lower halves. Spikes from upper channels vote "up," lower channels vote "down." The ratio is smoothed exponentially and scaled by your gain setting. Your spatial filter changes which channels participate — feeding "top half" to one side means only upper electrodes drive that paddle.
 
-A population decoder interprets the neural response. Not single-channel mapping, but spatial analysis: which region of the MEA fired most, with what intensity, at what latency. The spike pattern becomes a game action — paddle direction, movement speed, decision confidence.
+### Visualization
 
-### Visualization: The Brain
-
-Three.js renders the 59 electrodes as a 3D neural surface. Every data point drives the visual:
-
-| Neural Signal | Visual Effect |
-|---|---|
-| Spike amplitude | Node brightness |
-| Firing rate | Pulse frequency |
-| Cross-channel correlation | Visible connections between nodes |
-| Stimulation input | Ripple effect from stimulated region |
-| Population burst | Full-surface wave cascade |
-
-The CL SDK's analysis toolkit runs in parallel, feeding real neuroscience metrics into an overlay dashboard:
-
-- **Firing statistics** — per-channel and culture-wide rates
-- **Network bursts** — population-level activity detection
-- **Criticality** — is the network at the edge of chaos? (avalanche analysis, branching ratio, DCC)
-- **Functional connectivity** — correlation-based adjacency matrices, clustering coefficients, modularity
-- **Information entropy** — complexity of the neural response
+Three.js renders 59 electrodes per brain as a curved 3D surface. Spike activity drives blue glow (left brain) or orange glow (right brain). Stimulation channels (computed from ball position) light up to show what each brain would "see" in a live experiment. Pong renders as a 2D overlay between the two brains.
 
 ## Architecture
 
 ```
-pinkysbrain/
-├── server/                    # Python — CL SDK integration
-│   ├── replay/                # Neural recording management (HDF5)
-│   ├── decoder/               # Population spike → game action decoding
-│   ├── analysis/              # Real-time analysis pipeline (CL SDK)
-│   └── ws/                    # WebSocket server (spike/stim streaming)
-│
-├── web/                       # TypeScript — Browser application
-│   ├── engine/                # Game engine (Pong, Snake, reaction tests)
-│   ├── brain/                 # Three.js 3D brain renderer
-│   ├── dashboard/             # Analysis visualization overlay
-│   └── app/                   # React app shell
-│
-└── data/                      # Neural recordings (HDF5)
-    ├── raw/                   # Original CL1 recordings
-    └── indexed/               # Preprocessed for replay
+web/
+├── app/
+│   ├── engine/              # Client-side game engine (TypeScript)
+│   │   ├── match.ts         # BrainMatch: orchestrates two recordings
+│   │   ├── replay.ts        # SpikeReplay: reads spike JSON, yields per-tick
+│   │   ├── decoder.ts       # Spike population → paddle direction + spatial filter
+│   │   ├── encoder.ts       # Ball position → stim channels (visualization only)
+│   │   ├── game.ts          # Pong physics
+│   │   ├── analysis.ts      # Firing rate tracker
+│   │   ├── config.ts        # MEA layout, game parameters
+│   │   └── types.ts         # Shared types
+│   ├── components/
+│   │   ├── BrainMatchView.tsx   # Two-brain + Pong Three.js renderer
+│   │   ├── NeuralBrain.tsx      # Single-brain renderer (landing page demo)
+│   │   └── AnalysisOverlay.tsx  # Firing rate grid + metrics
+│   ├── page.tsx             # Landing page
+│   └── play/page.tsx        # Game: selection → match → results
+├── public/
+│   └── recordings/          # Extracted spike data (JSON, no raw traces)
+│       ├── index.json       # Recording metadata
+│       ├── monolayer_1.json # ~1.2 MB
+│       ├── monolayer_2.json # ~148 KB
+│       ├── monolayer_3.json # ~31 KB
+│       ├── organoid_1.json  # ~1.5 MB
+│       └── organoid_2.json  # ~71 KB
+
+scripts/
+└── extract_spikes.py        # HDF5 → JSON extraction (dev tool)
+
+server/                      # Python backend (optional, for live CL1 hardware)
 ```
 
-### Data Flow
+### Neural Data Pipeline
 
-1. Browser connects to Python backend via WebSocket
-2. Game starts → game state sent to server
-3. Server encodes state as stim pattern, feeds to CL SDK replay
-4. CL SDK replays neural recording, yields spikes + raw samples
-5. Server decodes spike population → game action
-6. Server streams spikes, stims, analysis, and decoded action back to browser
-7. Three.js renders neural activity on 3D brain in real time
-8. Game engine applies neural decision, advances state
-9. Loop continues at configurable tick rate
+Raw HDF5 recordings (~500 MB-1 GB each with voltage traces) are processed by `scripts/extract_spikes.py` into compact JSON files containing only spike events (`[timestamp, channel]` pairs). These JSON files are served as static assets — **no raw voltage traces are exposed to clients**.
+
+| Recording | Type | Spikes | JSON Size |
+|-----------|------|--------|-----------|
+| monolayer_1 | Monolayer | 95,950 | 1.2 MB |
+| monolayer_2 | Monolayer | 11,809 | 148 KB |
+| monolayer_3 | Monolayer | 2,468 | 31 KB |
+| organoid_1 | Organoid | 127,175 | 1.5 MB |
+| organoid_2 | Organoid | 5,685 | 71 KB |
 
 ### Tech Stack
 
 | Layer | Technology |
 |---|---|
-| 3D Visualization | Three.js with GPU instancing |
-| Frontend | React, TypeScript |
-| Real-time Transport | WebSocket (binary frames, msgpack) |
-| Neural Data | CL SDK (Python), HDF5 via PyTables |
-| Analysis | CL SDK analysis module (scipy, networkx, numpy) |
-| Hosting | Static frontend (Vercel), Python backend (Fly.io / Railway) |
-
-## Games
-
-### Phase 1 — Pong
-The classic. Ball position encoded as spatial stimulation, paddle movement decoded from population response. Direct comparison to DishBrain. Users play against the same neurons that learned the game.
-
-### Phase 2 — Reaction Challenge
-Simple stimulus-response timing. Flash a signal, measure how fast the neurons react vs. how fast you react. Shareable result card: "Your reaction time vs. 800K neurons."
-
-### Phase 3 — Pattern Recognition
-Present visual patterns encoded as multi-channel stimulation. Measure how the neural network's response differentiates between patterns. Can the neurons tell a circle from a square? Can you decode their answer better than the default decoder?
-
-### Phase 4 — Community Decoders
-Open the decoder layer. Let users write and submit their own decoding algorithms. Leaderboard: whose decoder extracts the best game performance from the same neural data? This is where it gets scientifically interesting.
-
-## Neural Data
-
-This platform is built to work with real CL1 neural recordings. The CL SDK's replay mode accepts HDF5 files containing raw samples, spike tables, and stim tables at 25 kHz across 64 channels.
-
-**Current status:** The platform architecture is ready. The visualization pipeline, game engine, WebSocket transport, and analysis integration are designed around the CL SDK's exact data format and API. What we need is real neural recordings from CL1 gameplay sessions to bring it to life.
-
-We can bootstrap with the CL SDK's random-mode simulator for development, but the magic — the thing that makes this shareable, credible, and scientifically meaningful — is real data from real neurons.
-
-### For Cortical Labs
-
-We're building the community gateway to biological computing. pinkysbrain makes your technology accessible to anyone with a browser — no $35K hardware, no $300/week cloud access, no Python setup. Just open a URL and play against neurons.
-
-**What this does for CL1 adoption:**
-- Hundreds of thousands of people experience biological computing for the first time
-- Every game generates shareable content that references Cortical Labs
-- The decoder challenge creates a developer community around your platform
-- Players who want the real thing → Cortical Cloud funnel
-- Open source means the community builds on your ecosystem
-
-**What we need:**
-- Sample CL1 recordings from gameplay sessions (Pong / reaction tasks) in the CL SDK's HDF5 format
-- Permission to use them in this open-source, non-commercial project (compatible with CL SDK's CC BY-NC 4.0 license)
-- Optionally: a Cortical Cloud connection for live "play against real neurons" events
-
-**What you get:**
-- A free, open-source showcase for your technology
-- Direct attribution and branding throughout the platform
-- A community tool that makes the CL SDK ecosystem more valuable
-- Content that markets itself — every game played is potential viral reach
+| 3D Visualization | Three.js |
+| Frontend | Next.js 16, React 19, Tailwind CSS 4 |
+| Game Engine | TypeScript (runs entirely in browser) |
+| Hosting | Vercel (static) |
 
 ## Development
 
 ```bash
-# Prerequisites
-# Python 3.12+, Node.js 20+, pnpm
+# Prerequisites: Node.js 20+, pnpm
 
-# Install dependencies
-cd web && pnpm install && cd ..
-pip install -r requirements.txt
+cd web
+pnpm install
+pnpm dev
 
-# Start the backend (CL SDK simulator + WebSocket server)
-python -m server
+# Open http://localhost:3000
+```
 
-# Start the frontend (in another terminal)
-cd web && pnpm dev
+To re-extract spike data from HDF5 recordings (requires Python 3.12+, h5py, numpy):
 
-# Open http://localhost:3000/play to play Pong against the neurons
-
-# With real neural data
-CL_SDK_REPLAY_PATH=data/raw/pong_session_01.h5 python -m server
+```bash
+uv run --with h5py --with numpy python3 scripts/extract_spikes.py
 ```
 
 ## Roadmap
 
 - [x] Three.js 3D brain renderer with 59-electrode MEA layout
-- [x] WebSocket pipeline (Python CL SDK ↔ Browser)
-- [x] Pong game engine with stim encoder / spike decoder
+- [x] Cortical Labs HDF5 recording integration
+- [x] Client-side game engine (no server needed)
+- [x] Two-brain match mode with feed controls
+- [x] Spatial filtering, gain control, time offset
 - [x] Real-time firing rate analysis
-- [x] Analysis dashboard overlay
-- [ ] Full CL SDK analysis integration (connectivity, criticality)
-- [ ] Real CL1 neural recordings integration
-- [ ] Reaction challenge game mode
-- [ ] Pattern recognition game mode
+- [ ] Burst detection and spatial propagation visualization
+- [ ] Match history and shareable results
 - [ ] Community decoder submissions + leaderboard
 - [ ] Live neuron mode via Cortical Cloud
 
@@ -203,7 +160,7 @@ CL_SDK_REPLAY_PATH=data/raw/pong_session_01.h5 python -m server
 
 MIT — the platform code is fully open source.
 
-Neural recordings, when provided, will respect Cortical Labs' licensing terms.
+Neural recordings provided by Cortical Labs for development and testing.
 
 ## Name
 
