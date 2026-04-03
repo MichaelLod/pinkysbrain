@@ -168,7 +168,7 @@ export default function BrainMatchView({ tickRef, scoreRef }: BrainMatchViewProp
       0.1,
       100
     );
-    camera.position.set(0, 5.5, 2.5);
+    camera.position.set(0, 5, 2);
     camera.lookAt(0, 0, 0);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -182,12 +182,13 @@ export default function BrainMatchView({ tickRef, scoreRef }: BrainMatchViewProp
     const leftElectrodes = createBrainGroup(brainScene, -2);
     const rightElectrodes = createBrainGroup(brainScene, 2);
 
-    // --- Pong scene ---
-    const aspect = container.clientWidth / container.clientHeight;
+    // --- Pong scene (rendered in bottom half) ---
     const pongScene = new THREE.Scene();
+    // Pong ortho camera sized for the bottom viewport
+    const pongAspect = container.clientWidth / (container.clientHeight * 0.45);
     const pongCamera = new THREE.OrthographicCamera(
-      -aspect,
-      aspect,
+      -pongAspect,
+      pongAspect,
       1,
       -1,
       0,
@@ -195,8 +196,8 @@ export default function BrainMatchView({ tickRef, scoreRef }: BrainMatchViewProp
     );
     pongCamera.position.z = 1;
 
-    const fieldW = 1.2;
-    const fieldH = 0.8;
+    const fieldW = 1.6;
+    const fieldH = 0.9;
     const fieldX = 0;
 
     const bgGeo = new THREE.PlaneGeometry(fieldW, fieldH);
@@ -292,10 +293,34 @@ export default function BrainMatchView({ tickRef, scoreRef }: BrainMatchViewProp
       brainScene.rotation.y = Math.sin(time * 0.1) * 0.08;
       brainScene.rotation.x = Math.sin(time * 0.07) * 0.02;
 
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      const brainH = Math.floor(h * 0.55);
+      const pongH = h - brainH;
+
+      renderer.setScissorTest(true);
+
+      // Top half: brains
+      renderer.setViewport(0, pongH, w, brainH);
+      renderer.setScissor(0, pongH, w, brainH);
+      camera.aspect = w / brainH;
+      camera.updateProjectionMatrix();
+      renderer.setClearColor(0x050508, 1);
       renderer.clear();
       renderer.render(brainScene, camera);
-      renderer.clearDepth();
+
+      // Bottom half: Pong
+      renderer.setViewport(0, 0, w, pongH);
+      renderer.setScissor(0, 0, w, pongH);
+      const pa = w / pongH;
+      pongCamera.left = -pa;
+      pongCamera.right = pa;
+      pongCamera.updateProjectionMatrix();
+      renderer.setClearColor(0x030306, 1);
+      renderer.clear();
       renderer.render(pongScene, pongCamera);
+
+      renderer.setScissorTest(false);
 
       animationId = requestAnimationFrame(animate);
     }
@@ -303,13 +328,7 @@ export default function BrainMatchView({ tickRef, scoreRef }: BrainMatchViewProp
     animationId = requestAnimationFrame(animate);
 
     function handleResize() {
-      camera.aspect = container.clientWidth / container.clientHeight;
-      camera.updateProjectionMatrix();
       renderer.setSize(container.clientWidth, container.clientHeight);
-      const newAspect = container.clientWidth / container.clientHeight;
-      pongCamera.left = -newAspect;
-      pongCamera.right = newAspect;
-      pongCamera.updateProjectionMatrix();
     }
 
     window.addEventListener("resize", handleResize);
